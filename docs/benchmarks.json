@@ -1,0 +1,42 @@
+{
+  "crossDocLowestPriceVerified" : true,
+  "crossDocSynthesisMs" : 15.71810245513916,
+  "generatedAtISO8601" : "2026-11-24T04:58:39Z",
+  "hostArchitecture" : "Apple Silicon (arm64)",
+  "incrementalRescanSkipMs" : 8.60905647277832,
+  "initialCorpusIndexMs" : 1290.9950017929077,
+  "osVersion" : "Version 26.7.2 (Build 25G332)",
+  "pdfMultiPageVerified" : true,
+  "rescanSpeedupFactor" : 149.9577806087125,
+  "scalePoints" : [
+    {
+      "bytesPerChunk" : 1150.976,
+      "chunkCount" : 1000,
+      "databaseBytes" : 1150976,
+      "searchP50Ms" : 1.8121004104614258,
+      "searchP95Ms" : 3.8459300994873047
+    },
+    {
+      "bytesPerChunk" : 1069.8752,
+      "chunkCount" : 5000,
+      "databaseBytes" : 5349376,
+      "searchP50Ms" : 4.0999650955200195,
+      "searchP95Ms" : 7.458925247192383
+    },
+    {
+      "bytesPerChunk" : 1057.5872,
+      "chunkCount" : 10000,
+      "databaseBytes" : 10575872,
+      "searchP50Ms" : 8.562922477722168,
+      "searchP95Ms" : 12.937068939208984
+    },
+    {
+      "bytesPerChunk" : 1076.4288,
+      "chunkCount" : 25000,
+      "databaseBytes" : 26910720,
+      "searchP50Ms" : 23.778080940246582,
+      "searchP95Ms" : 37.262916564941406
+    }
+  ],
+  "visionOCRVerified" : true
+}
