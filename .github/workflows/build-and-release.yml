@@ -1,0 +1,117 @@
+name: Build, Verify, Benchmark & Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release semantic version (without v prefix)"
+        required: false
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-verify-release:
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ github.event.inputs.release_version || '1.0.0' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify Apple Silicon runner and Swift 6 toolchain
+        run: |
+          sw_vers
+          uname -m
+          swift --version
+
+      - name: Run full XCTest verification suite
+        run: swift test --parallel
+
+      - name: Build release binaries
+        run: swift build -c release
+
+      - name: Generate AppIcon, real SwiftUI screenshots, and live Apple Silicon Local RAG graphs
+        run: |
+          .build/release/VaultMindTools
+          ls -lh docs/assets/icon.png docs/screenshots/*.png docs/graphs/* docs/benchmarks.json
+          sips -g pixelWidth -g pixelHeight docs/assets/icon.png docs/screenshots/*.png docs/graphs/*.png
+
+      - name: Inject live measured benchmark table into README.md
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          readme = Path("README.md").read_text(encoding="utf-8")
+          summary = Path("docs/benchmark-summary.md").read_text(encoding="utf-8").strip()
+          start_marker = "<!-- BENCHMARK_TABLE_START -->"
+          end_marker = "<!-- BENCHMARK_TABLE_END -->"
+          assert start_marker in readme and end_marker in readme, "Missing benchmark markers in README.md"
+          before, rest = readme.split(start_marker, 1)
+          _, after = rest.split(end_marker, 1)
+          updated = f"{before}{start_marker}\n{summary}\n{end_marker}{after}"
+          Path("README.md").write_text(updated, encoding="utf-8")
+          PY
+
+      - name: Package signed VaultMind.app, DMG, ZIP, and SHA256SUMS
+        run: |
+          chmod +x Scripts/package_release.sh
+          ./Scripts/package_release.sh "${VERSION}"
+
+      - name: Commit generated screenshots, icon, and measured benchmark graphs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ README.md
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: update rendered SwiftUI screenshots and Apple Silicon benchmark graphs [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Publish GitHub Release with DMG, ZIP, and checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${VERSION}"
+          COMMIT_SHA=$(git rev-parse HEAD)
+          DMG_SIZE=$(du -sh "dist/VaultMind-${VERSION}.dmg" | awk '{print $1}')
+          APP_SIZE=$(du -sh "dist/VaultMind.app" | awk '{print $1}')
+
+          {
+            echo "## Vault Mind ${TAG} — Local Multi-File Analyst Brain for macOS"
+            echo ""
+            echo "Native **Swift 6** floating analyst HUD (\`⌥⇧B\`) & menu bar app for Apple Silicon Macs (macOS 15+)."
+            echo "Live-indexes PDFs (\`PDFKit\`), screenshots/scans (\`Vision\` OCR), Markdown, CSV & code via macOS \`FSEvents\` + \`CryptoKit\` SHA-256 skip gate + SQLite WAL \`FTS5\` + 128-d \`vDSP\` vectors, synthesizing cited answers and CSV/Markdown comparison tables offline."
+            echo ""
+            echo "- **App Bundle Size:** \`${APP_SIZE}\` · **DMG Installer:** \`${DMG_SIZE}\`"
+            echo "- **Zero Cloud Uploads · Exact Page/Line Citations · Auto Comparison Matrices · MIT License**"
+            echo ""
+            cat docs/benchmark-summary.md
+            echo ""
+            echo "### SHA-256 Checksums"
+            echo '```text'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+            echo ""
+            echo "### First-Launch Note (Ad-Hoc Signed Open-Source Build)"
+            echo '```bash'
+            echo "xattr -dr com.apple.quarantine /Applications/VaultMind.app"
+            echo '```'
+          } > release-notes.md
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release delete "${TAG}" --yes --cleanup-tag
+          fi
+
+          gh release create "${TAG}" \
+            "dist/VaultMind-${VERSION}.dmg" \
+            "dist/VaultMind-${VERSION}.zip" \
+            "dist/SHA256SUMS.txt" \
+            --target "${COMMIT_SHA}" \
+            --title "Vault Mind ${TAG} — Local Multi-File Analyst Brain" \
+            --notes-file release-notes.md
