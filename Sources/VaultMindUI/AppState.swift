@@ -77,7 +77,7 @@ public final class VaultAppState {
         guard !isPreviewSnapshot else { return }
         await reloadStats()
         if let store {
-            let counts = (try? await store.totals()) ?? (0, 0)
+            let counts = (try? await store.totals()) ?? (files: 0, chunks: 0)
             if counts.chunks == 0 {
                 currentAnswer = VaultSampleData.demoAnswer()
             } else {
